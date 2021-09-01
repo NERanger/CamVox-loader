@@ -19,10 +19,12 @@ CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : roo
 
     rgb_path_ = root_ / ("color_img");
     depth_path_ = root_ / ("depth_img");
+    gt_path_ = root_ / ("groundtruth.csv");
 
-    cout << "[CamvoxLoader] Desired data path:" << endl
+    cout << "[CamvoxLoader] Expected data path:" << endl
          << "-- RGB image: " << rgb_path_.string() << endl
-         << "-- Depth image: " << depth_path_.string() << endl;
+         << "-- Depth image: " << depth_path_.string() << endl
+         << "-- Groundtruth: " << gt_path_.string() << endl;
 
     if(!(exists(rgb_path_) && exists(depth_path_))){
         cerr << "[CamvoxLoader] Dataset not complete, check if the desired data path exists." << endl;
@@ -31,6 +33,15 @@ CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : roo
 
     size_t rgb_img_num = GetFileNumInDir(rgb_path_);
     size_t depth_img_num = GetFileNumInDir(depth_path_);
+
+    if(exists(gt_path_)){
+        csvreader_ptr_ = std::make_shared<io::CSVReader<8>>(gt_path_.string());
+        gt_pose_ptr_ = LoadPoseInMemory();
+        gt_pose_ptr_ = TransformPoseRelativeTo(gt_pose_ptr_, 0);
+    }else{
+        // No groundtruth is not considered as failure
+        cerr << "[CamvoxLoader] No groundtruth file provided" << endl;
+    }
 
     if (! (rgb_img_num == depth_img_num)){
         cerr << "[CamvoxLoader] Dataset not complete, frame number of "
@@ -58,6 +69,47 @@ CamvoxFrame CamvoxLoader::operator[](size_t i) const{
     CamvoxFrame f;
     f.rgb_img = cv::imread(rgb_img_path);
     f.depth_img = cv::imread(depth_img_path);
+    f.pose = gt_pose_ptr_->at(i);
 
     return f;
+}
+
+CamvoxLoader::PosesVecPtr CamvoxLoader::TransformPoseRelativeTo(const CamvoxLoader::PosesVecPtr poses_ptr, size_t rel){
+    PosesVecPtr transed_poses = std::make_shared<PoseVecType>();
+
+    for(size_t i = 0; i < poses_ptr->size(); ++i){
+        Eigen::Isometry3d transed = poses_ptr->at(rel).inverse() * poses_ptr->at(i);
+        transed_poses->emplace_back(transed);
+    }
+
+    return transed_poses;
+}
+
+CamvoxLoader::PosesVecPtr CamvoxLoader::LoadPoseInMemory() const{
+    if(csvreader_ptr_ == nullptr){
+        return nullptr;
+    }
+
+    csvreader_ptr_->read_header(io::ignore_extra_column, header_seq_str_, 
+                                header_x_str_, header_y_str_, header_z_str_, 
+                                header_quat_x_str_, header_quat_y_str_, header_quat_z_str_, header_quat_w_str_);
+
+    int seq;
+    double position_x, position_y, position_z;
+    double quat_x, quat_y, quat_z, quat_w;
+
+    PosesVecPtr poses_ptr = std::make_shared<PoseVecType>();
+    while(csvreader_ptr_->read_row(seq, position_x, position_y, position_z, quat_x, quat_y, quat_z, quat_w)){
+        Eigen::Vector3d trans(position_x, position_y, position_z);
+        Eigen::Quaterniond quat(quat_w, quat_x, quat_y, quat_z);
+
+        Eigen::Isometry3d iso(Eigen::Isometry3d::Identity());
+        iso.rotate(quat);
+        iso.pretranslate(trans);
+
+        poses_ptr->emplace_back(iso);
+    }
+
+    return poses_ptr;
+
 }

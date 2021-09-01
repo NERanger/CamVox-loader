@@ -8,6 +8,8 @@ set(CMAKE_CXX_FLAGS_RELEASE  "-std=c++17 -O2")
 
 find_package(OpenCV 3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem system)
+find_package(Eigen3 REQUIRED)
+find_package(Threads REQUIRED)
 
 include_directories(
     ${OpenCV_INCLUDE_DIRS}
@@ -20,4 +22,6 @@ target_link_libraries(
         ${OpenCV_LIBS}
         ${Boost_FILESYSTEM_LIBRARY_RELEASE}
         ${Boost_SYSTEM_LIBRARY_RELEASE}
+        Eigen3::Eigen
+        Threads::Threads
 )

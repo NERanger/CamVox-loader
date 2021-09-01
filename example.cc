@@ -32,7 +32,9 @@ int main(int argc, char const *argv[]){
         cv::imshow("rgb", f.rgb_img);
         cv::imshow("depth", f.depth_img);
 
-        cv::waitKey(10);
+        std::cout << f.pose.matrix() << std::endl;
+
+        cv::waitKey(0);
     }
     
     return EXIT_SUCCESS;
