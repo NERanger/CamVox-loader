@@ -20,6 +20,7 @@ CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : roo
     rgb_path_ = root_ / ("color_img");
     depth_path_ = root_ / ("depth_img");
     gt_path_ = root_ / ("groundtruth.csv");
+    config_path_ = root_ / ("config.yaml");
 
     cout << "[CamvoxLoader] Expected data path:" << endl
          << "-- RGB image: " << rgb_path_.string() << endl
@@ -31,17 +32,25 @@ CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : roo
         if_success = false;
     }
 
-    size_t rgb_img_num = GetFileNumInDir(rgb_path_);
-    size_t depth_img_num = GetFileNumInDir(depth_path_);
-
     if(exists(gt_path_)){
         csvreader_ptr_ = std::make_shared<io::CSVReader<8>>(gt_path_.string());
         gt_pose_ptr_ = LoadPoseInMemory();
         gt_pose_ptr_ = TransformPoseRelativeTo(gt_pose_ptr_, 0);
     }else{
-        // No groundtruth is not considered as failure
         cerr << "[CamvoxLoader] No groundtruth file provided" << endl;
+        if_success = false;
     }
+
+    if(exists(config_path_)){
+        config_fs_ = cv::FileStorage(config_path_.string(), cv::FileStorage::READ);
+        LoadConfig();
+    }else{
+        cerr << "[CamvoxLoader] No configuration file provided" << endl;
+        if_success = false;
+    }
+
+    size_t rgb_img_num = GetFileNumInDir(rgb_path_);
+    size_t depth_img_num = GetFileNumInDir(depth_path_);
 
     if (! (rgb_img_num == depth_img_num)){
         cerr << "[CamvoxLoader] Dataset not complete, frame number of "
@@ -74,7 +83,7 @@ CamvoxFrame CamvoxLoader::operator[](size_t i) const{
     return f;
 }
 
-CamvoxLoader::PosesVecPtr CamvoxLoader::TransformPoseRelativeTo(const CamvoxLoader::PosesVecPtr poses_ptr, size_t rel){
+CamvoxLoader::PosesVecPtr CamvoxLoader::TransformPoseRelativeTo(const CamvoxLoader::PosesVecPtr poses_ptr, size_t rel) const{
     PosesVecPtr transed_poses = std::make_shared<PoseVecType>();
 
     for(size_t i = 0; i < poses_ptr->size(); ++i){
@@ -112,4 +121,27 @@ CamvoxLoader::PosesVecPtr CamvoxLoader::LoadPoseInMemory() const{
 
     return poses_ptr;
 
+}
+
+void CamvoxLoader::LoadConfig(){
+    cam_intrinsics_.fx = (float)config_fs_["Camera.fx"];
+    cam_intrinsics_.fy = (float)config_fs_["Camera.fy"];
+    cam_intrinsics_.cx = (float)config_fs_["Camera.cx"];
+    cam_intrinsics_.cy = (float)config_fs_["Camera.cy"];
+
+    depth_factor_ = (float)config_fs_["DepthMapFactor"];
+
+    cv::Mat Tbc;
+    config_fs_["Tbc"] >> Tbc;
+
+    Eigen::Matrix4d m;
+
+    for(int col = 0; col < Tbc.cols; ++col){
+        for(int row = 0; row < Tbc.rows; ++row){
+            m(col, row) =  Tbc.at<float>(col, row);
+        }
+    }
+
+    Tbc_ = Eigen::Isometry3d(m);
+    
 }

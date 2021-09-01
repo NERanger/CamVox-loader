@@ -23,19 +23,29 @@ int main(int argc, char const *argv[]){
         return EXIT_FAILURE;
     }
 
-    for(size_t i = 0; i < dataset.Size(); ++i){
-        CamvoxFrame f = dataset[i];
+    std::cout << "Camera intrinsics: " << std::endl
+              << "Fx: " << dataset.GetCamIntrisics().fx << std::endl
+              << "Fy: " << dataset.GetCamIntrisics().fy << std::endl
+              << "Cx: " << dataset.GetCamIntrisics().cx << std::endl
+              << "Cy: " << dataset.GetCamIntrisics().cy << std::endl;
 
-        cv::resize(f.rgb_img, f.rgb_img, cv::Size(), 0.5, 0.5);
-        cv::resize(f.depth_img, f.depth_img, cv::Size(), 0.5, 0.5);
+    std::cout << "Depth Factor: " << dataset.GetDepthFactor() << std::endl;
 
-        cv::imshow("rgb", f.rgb_img);
-        cv::imshow("depth", f.depth_img);
+    std::cout << "Tbc: " << std::endl << dataset.GetTbc().matrix() << std::endl;
 
-        std::cout << f.pose.matrix() << std::endl;
+    // for(size_t i = 0; i < dataset.Size(); ++i){
+    //     CamvoxFrame f = dataset[i];
 
-        cv::waitKey(0);
-    }
+    //     cv::resize(f.rgb_img, f.rgb_img, cv::Size(), 0.5, 0.5);
+    //     cv::resize(f.depth_img, f.depth_img, cv::Size(), 0.5, 0.5);
+
+    //     cv::imshow("rgb", f.rgb_img);
+    //     cv::imshow("depth", f.depth_img);
+
+    //     std::cout << f.pose.matrix() << std::endl;
+
+    //     cv::waitKey(0);
+    // }
     
     return EXIT_SUCCESS;
 }

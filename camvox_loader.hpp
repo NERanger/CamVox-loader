@@ -19,6 +19,13 @@ struct CamvoxFrame{
     Eigen::Isometry3d pose;
 };
 
+struct CameraIntrinsics{
+    float fx;
+    float fy;
+    float cx;
+    float cy;
+};
+
 class CamvoxLoader{
 public:
     using PoseVecType = std::vector<Eigen::Isometry3d, Eigen::aligned_allocator<Eigen::Isometry3d>>;
@@ -27,24 +34,37 @@ public:
     CamvoxLoader(const std::string &data_root, bool &if_success);
 
     inline size_t Size(){return size_;}
+    inline CameraIntrinsics GetCamIntrisics(){return cam_intrinsics_;}
+    inline float GetDepthFactor(){return depth_factor_;}
+    inline Eigen::Isometry3d GetTbc(){return Tbc_;}
 
     CamvoxFrame operator[](size_t i) const;
-
-    static PosesVecPtr TransformPoseRelativeTo(const PosesVecPtr poses_ptr, size_t rel);
 
 private:
     size_t GetFileNumInDir(const boost::filesystem::path &p) const;
 
     PosesVecPtr LoadPoseInMemory() const;
+    PosesVecPtr TransformPoseRelativeTo(const PosesVecPtr poses_ptr, size_t rel) const;
+
+    void LoadConfig();
 
     std::shared_ptr<io::CSVReader<8>> csvreader_ptr_ = nullptr;
 
     PosesVecPtr gt_pose_ptr_ = nullptr;
 
+    // FileStorage for yaml config file
+    cv::FileStorage config_fs_;
+
+    // Path
     boost::filesystem::path root_;
     boost::filesystem::path rgb_path_;
     boost::filesystem::path depth_path_;
     boost::filesystem::path gt_path_;
+    boost::filesystem::path config_path_;
+
+    CameraIntrinsics cam_intrinsics_;
+    Eigen::Isometry3d Tbc_;  // Transformation from camera to body(IMU)
+    float depth_factor_;
 
     size_t size_ = 0;
 
