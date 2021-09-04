@@ -4,6 +4,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 
+#include <Eigen/Geometry>
+
 #include "camvox_loader.hpp"
 
 using std::cout;
@@ -27,20 +29,13 @@ CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : roo
          << "-- Depth image: " << depth_path_.string() << endl
          << "-- Groundtruth: " << gt_path_.string() << endl;
 
+    // Check egb and depth image
     if(!(exists(rgb_path_) && exists(depth_path_))){
         cerr << "[CamvoxLoader] Dataset not complete, check if the desired data path exists." << endl;
         if_success = false;
     }
 
-    if(exists(gt_path_)){
-        csvreader_ptr_ = std::make_shared<io::CSVReader<8>>(gt_path_.string());
-        gt_pose_ptr_ = LoadPoseInMemory();
-        gt_pose_ptr_ = TransformPoseRelativeTo(gt_pose_ptr_, 0);
-    }else{
-        cerr << "[CamvoxLoader] No groundtruth file provided" << endl;
-        if_success = false;
-    }
-
+    // Check & load config file
     if(exists(config_path_)){
         config_fs_ = cv::FileStorage(config_path_.string(), cv::FileStorage::READ);
         LoadConfig();
@@ -48,7 +43,19 @@ CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : roo
         cerr << "[CamvoxLoader] No configuration file provided" << endl;
         if_success = false;
     }
+    
+    // Check & load groundtruth
+    if(exists(gt_path_)){
+        csvreader_ptr_ = std::make_shared<io::CSVReader<8>>(gt_path_.string());
+        gt_pose_ptr_ = LoadPoseInMemory();
+        TransformToCamFrame();
+        // TransformPoseRelativeTo(0);
+    }else{
+        cerr << "[CamvoxLoader] No groundtruth file provided" << endl;
+        if_success = false;
+    }
 
+    // Get total number
     size_t rgb_img_num = GetFileNumInDir(rgb_path_);
     size_t depth_img_num = GetFileNumInDir(depth_path_);
 
@@ -78,20 +85,37 @@ CamvoxFrame CamvoxLoader::operator[](size_t i) const{
     CamvoxFrame f;
     f.rgb_img = cv::imread(rgb_img_path);
     f.depth_img = cv::imread(depth_img_path);
-    f.pose = gt_pose_ptr_->at(i);
+    f.Twc = gt_pose_ptr_->at(i);
 
     return f;
 }
 
-CamvoxLoader::PosesVecPtr CamvoxLoader::TransformPoseRelativeTo(const CamvoxLoader::PosesVecPtr poses_ptr, size_t rel) const{
-    PosesVecPtr transed_poses = std::make_shared<PoseVecType>();
+void CamvoxLoader::TransformToCamFrame(){
+    // Toc: From camera to world (first frame)
+    PosesVecPtr Twc_poses = std::make_shared<PoseVecType>();
 
-    for(size_t i = 0; i < poses_ptr->size(); ++i){
-        Eigen::Isometry3d transed = poses_ptr->at(rel).inverse() * poses_ptr->at(i);
-        transed_poses->emplace_back(transed);
+    // Currently gt_pose_ptr_ holds all Tob (body to origin)
+    // Twc = Twb * Tbc
+    for(size_t i = 0; i < gt_pose_ptr_->size(); ++i){
+        Eigen::Isometry3d Twc = gt_pose_ptr_->at(i) * Tbc_;
+        Twc_poses->emplace_back(Twc);
     }
 
-    return transed_poses;
+    gt_pose_ptr_ = Twc_poses;
+}
+
+void CamvoxLoader::TransformPoseRelativeTo(size_t rel){
+    // Twc: "w" means the given pose (usually first pose in the sequence)
+    PosesVecPtr Twc_poses = std::make_shared<PoseVecType>();
+
+    Eigen::Isometry3d w_inv = gt_pose_ptr_->at(rel).inverse();
+
+    for(size_t i = 0; i < gt_pose_ptr_->size(); ++i){
+        Eigen::Isometry3d Twc = w_inv * gt_pose_ptr_->at(i);
+        Twc_poses->emplace_back(Twc);
+    }
+
+    gt_pose_ptr_ = Twc_poses;
 }
 
 CamvoxLoader::PosesVecPtr CamvoxLoader::LoadPoseInMemory() const{
@@ -107,16 +131,37 @@ CamvoxLoader::PosesVecPtr CamvoxLoader::LoadPoseInMemory() const{
     double position_x, position_y, position_z;
     double quat_x, quat_y, quat_z, quat_w;
 
-    PosesVecPtr poses_ptr = std::make_shared<PoseVecType>();
+    std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> trans_vec;
+    std::vector<Eigen::Matrix3d, Eigen::aligned_allocator<Eigen::Matrix3d>> rot_vec;
+
+    // Populate trans and quat vector
     while(csvreader_ptr_->read_row(seq, position_x, position_y, position_z, quat_x, quat_y, quat_z, quat_w)){
-        Eigen::Vector3d trans(position_x, position_y, position_z);
-        Eigen::Quaterniond quat(quat_w, quat_x, quat_y, quat_z);
+        trans_vec.emplace_back(position_x, position_y, position_z);
+        rot_vec.emplace_back(Eigen::Quaterniond(quat_w, quat_x, quat_y, quat_z).toRotationMatrix());
+    }
 
-        Eigen::Isometry3d iso(Eigen::Isometry3d::Identity());
-        iso.rotate(quat);
-        iso.pretranslate(trans);
+    // Transform translation and quat to first frame
+    Eigen::Vector3d trans_origin = trans_vec[0];
+    Eigen::Matrix3d rot_origin = rot_vec[0];
+    for(size_t i = 0; i < trans_vec.size(); ++i){
+        trans_vec[i] -= trans_origin;
+    }
+    // o - origin: origin of UTM coordinate
+    // w - world: first body frame
+    // b - body: body(RTK) frame
+    // Rob = Row * Rwb
+    // Rwb = Row^T * Rob
+    for(size_t i = 0; i < rot_vec.size(); ++i){
+        rot_vec[i] = rot_origin.transpose() * rot_vec[i];
+    }
 
-        poses_ptr->emplace_back(iso);
+    // std::cout << rot_vec[0] << std::endl;
+
+    PosesVecPtr poses_ptr = std::make_shared<PoseVecType>();
+    for(size_t i = 0; i < trans_vec.size(); ++i){
+        Eigen::Isometry3d Twb(rot_vec[i]);
+        Twb.pretranslate(trans_vec[i]);
+        poses_ptr->emplace_back(Twb);
     }
 
     return poses_ptr;
@@ -142,6 +187,15 @@ void CamvoxLoader::LoadConfig(){
         }
     }
 
+    // std::cout << m.matrix() << std::endl;
     Tbc_ = Eigen::Isometry3d(m);
     
+}
+
+void CamvoxLoader::OutPutKittiFormat(std::ofstream &ofstream){
+    for(auto p : *gt_pose_ptr_){
+        ofstream << p(0, 0) << " " << p(0, 1) << " " << p(0, 2) << " " << p(0, 3) << " "
+                 << p(1, 0) << " " << p(1, 1) << " " << p(1, 2) << " " << p(1, 3) << " "
+                 << p(2, 0) << " " << p(2, 1) << " " << p(2, 2) << " " << p(2, 3) << std::endl;
+    }   
 }

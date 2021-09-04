@@ -31,21 +31,21 @@ int main(int argc, char const *argv[]){
 
     std::cout << "Depth Factor: " << dataset.GetDepthFactor() << std::endl;
 
-    std::cout << "Tbc: " << std::endl << dataset.GetTbc().matrix() << std::endl;
+    for(size_t i = 0; i < dataset.Size(); ++i){
+        CamvoxFrame f = dataset[i];
 
-    // for(size_t i = 0; i < dataset.Size(); ++i){
-    //     CamvoxFrame f = dataset[i];
+        cv::cvtColor(f.rgb_img, f.rgb_img, cv::COLOR_RGB2BGR);
 
-    //     cv::resize(f.rgb_img, f.rgb_img, cv::Size(), 0.5, 0.5);
-    //     cv::resize(f.depth_img, f.depth_img, cv::Size(), 0.5, 0.5);
+        cv::resize(f.rgb_img, f.rgb_img, cv::Size(), 0.5, 0.5);
+        cv::resize(f.depth_img, f.depth_img, cv::Size(), 0.5, 0.5);
 
-    //     cv::imshow("rgb", f.rgb_img);
-    //     cv::imshow("depth", f.depth_img);
+        cv::imshow("rgb", f.rgb_img);
+        cv::imshow("depth", f.depth_img);
 
-    //     std::cout << f.pose.matrix() << std::endl;
+        std::cout << f.Twc.matrix() << std::endl;
 
-    //     cv::waitKey(0);
-    // }
+        cv::waitKey(1);
+    }
     
     return EXIT_SUCCESS;
 }

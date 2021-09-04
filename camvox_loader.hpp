@@ -16,7 +16,7 @@ namespace camvox_loader{
 struct CamvoxFrame{
     cv::Mat rgb_img;
     cv::Mat depth_img;
-    Eigen::Isometry3d pose;
+    Eigen::Isometry3d Twc;
 };
 
 struct CameraIntrinsics{
@@ -36,7 +36,9 @@ public:
     inline size_t Size(){return size_;}
     inline CameraIntrinsics GetCamIntrisics(){return cam_intrinsics_;}
     inline float GetDepthFactor(){return depth_factor_;}
-    inline Eigen::Isometry3d GetTbc(){return Tbc_;}
+    // inline Eigen::Isometry3d GetTbc(){return Tbc_;}
+
+    void OutPutKittiFormat(std::ofstream &ofstream);
 
     CamvoxFrame operator[](size_t i) const;
 
@@ -44,7 +46,11 @@ private:
     size_t GetFileNumInDir(const boost::filesystem::path &p) const;
 
     PosesVecPtr LoadPoseInMemory() const;
-    PosesVecPtr TransformPoseRelativeTo(const PosesVecPtr poses_ptr, size_t rel) const;
+
+    // First, transform poses relative to the given (first) pose. Now we have Twb
+    void TransformToCamFrame();
+    // Then, get Twc = Twb * Tbc
+    void TransformPoseRelativeTo(size_t rel);
 
     void LoadConfig();
 
