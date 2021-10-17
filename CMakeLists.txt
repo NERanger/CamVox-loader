@@ -1,12 +1,23 @@
 cmake_minimum_required(VERSION 3.1)
 project(camvox_loader)
 
-set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall")
-set(CMAKE_CXX_FLAGS_RELEASE  "-std=c++17 -O3")
+set(CMAKE_CXX_STANDARD 17)
 
-find_package(OpenCV 3 REQUIRED)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  # using GCC
+  set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+  set(CMAKE_CXX_FLAGS_RELEASE  "-O3")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  # using Visual Studio C++
+  set(CMAKE_CXX_FLAGS_RELEASE  "/O2")
+endif()
+
+
+find_package(OpenCV 4 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem system)
 find_package(Eigen3 REQUIRED)
 find_package(Threads REQUIRED)
@@ -15,6 +26,7 @@ include_directories(
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
 )
+
 
 add_library(
     camvox_loader STATIC
