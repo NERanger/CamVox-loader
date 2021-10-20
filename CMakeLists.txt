@@ -18,25 +18,31 @@ endif()
 
 
 find_package(OpenCV 4 REQUIRED)
+find_package(PCL 1.3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem system)
 find_package(Eigen3 REQUIRED)
 find_package(Threads REQUIRED)
 
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 include_directories(
+    ${PROJECT_SOURCE_DIR}
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
 )
 
-
 add_library(
     camvox_loader STATIC
         camvox_loader.cc
+        stream_loader/stream_loader.cc
 )
 target_link_libraries(
     camvox_loader
         ${OpenCV_LIBS}
         ${Boost_FILESYSTEM_LIBRARY_RELEASE}
         ${Boost_SYSTEM_LIBRARY_RELEASE}
+        ${PCL_LIBRARIES}
         Eigen3::Eigen
         Threads::Threads
 )
@@ -44,5 +50,11 @@ target_link_libraries(
 add_executable(load_camvox example.cc)
 target_link_libraries(
     load_camvox 
+        camvox_loader
+)
+
+add_executable(load_stream example_stream.cc)
+target_link_libraries(
+    load_stream 
         camvox_loader
 )
