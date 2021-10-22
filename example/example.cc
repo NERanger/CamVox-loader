@@ -1,11 +1,11 @@
 #include <opencv2/opencv.hpp>
 
-#include "camvox_loader.hpp"
+#include "camvox_loader/camvox_loader.hpp"
 
 using std::string;
 
-using camvox_loader::CamvoxLoader;
-using camvox_loader::CamvoxFrame;
+using dataset_loader::CamvoxLoader;
+using dataset_loader::CamvoxFrame;
 
 int main(int argc, char const *argv[]){
     

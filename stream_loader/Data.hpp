@@ -5,7 +5,7 @@
 
 #include "stream_loader/LivoxPoint.hpp"
 
-namespace camvox_loader {
+namespace dataset_loader {
 
 enum DataType {
 	kDTypeLidar = 0,
@@ -30,6 +30,7 @@ public:
 	inline cv::Mat Img() const { return img_; }
 	inline pcl::PointCloud<LivoxPoint>::Ptr Ptcloud() const { return ptcloud_ptr_; }
 	inline ImuData Imu() const { return imu_; }
+	inline uint64_t Timestamp() const { return timestamp_; }
 
 	inline DataType DType() const { return d_type_; }
 

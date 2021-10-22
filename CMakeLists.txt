@@ -3,6 +3,7 @@ project(camvox_loader)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
+  add_definitions(-DNDEBUG)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -18,7 +19,7 @@ endif()
 
 
 find_package(OpenCV 4 REQUIRED)
-find_package(PCL 1.3 REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common io)
 find_package(Boost REQUIRED COMPONENTS filesystem system)
 find_package(Eigen3 REQUIRED)
 find_package(Threads REQUIRED)
@@ -33,12 +34,13 @@ include_directories(
 )
 
 add_library(
-    camvox_loader STATIC
-        camvox_loader.cc
-        stream_loader/stream_loader.cc
-)
+    dataset_loader STATIC
+        camvox_loader/camvox_loader.cc
+        stream_loader/StreamLoader.cc
+        utils/utils.cc)
+
 target_link_libraries(
-    camvox_loader
+    dataset_loader
         ${OpenCV_LIBS}
         ${Boost_FILESYSTEM_LIBRARY_RELEASE}
         ${Boost_SYSTEM_LIBRARY_RELEASE}
@@ -47,14 +49,5 @@ target_link_libraries(
         Threads::Threads
 )
 
-add_executable(load_camvox example.cc)
-target_link_libraries(
-    load_camvox 
-        camvox_loader
-)
-
-add_executable(load_stream example_stream.cc)
-target_link_libraries(
-    load_stream 
-        camvox_loader
-)
+add_subdirectory(example)
+add_subdirectory(tools)

@@ -11,7 +11,7 @@
 
 #include "csv.h"
 
-namespace camvox_loader{
+namespace dataset_loader {
 
 struct CamvoxFrame{
     cv::Mat rgb_img;

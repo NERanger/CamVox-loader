@@ -4,14 +4,14 @@
 
 #include <pcl/io/pcd_io.h>
 
-#include "stream_loader/stream_loader.hpp"
+#include "stream_loader/StreamLoader.hpp"
 
 using std::cout;
 using std::cerr;
 using std::endl;
 
-using camvox_loader::StreamLoader;
-using camvox_loader::Data;
+using dataset_loader::StreamLoader;
+using dataset_loader::Data;
 
 StreamLoader::StreamLoader(const std::string& root_dir) : root_(root_dir) {
 	using std::filesystem::exists;
@@ -20,12 +20,14 @@ StreamLoader::StreamLoader(const std::string& root_dir) : root_(root_dir) {
 	lidar_dir_ = root_ / ("lidar");
 	gt_file_ = root_ / ("groundtruth.csv");
 	seq_file_ = root_ / ("sequence.csv");
+	config_file_ = root_ / ("config.yaml");
 
 	cout << "[CamvoxLoader] Expected data path:" << endl
-		 << "-- RGB image: " << img_dir_.string() << endl
-		 << "-- LiDAR ptcloud: " << lidar_dir_.string() << endl
-		 << "-- Groundtruth: " << gt_file_.string() << endl
-		 << "-- Sequence: " << seq_file_.string() << endl;
+		<< "-- RGB image: " << img_dir_.string() << endl
+		<< "-- LiDAR ptcloud: " << lidar_dir_.string() << endl
+		<< "-- Groundtruth: " << gt_file_.string() << endl
+		<< "-- Sequence: " << seq_file_.string() << endl
+		<< "-- Config: " << config_file_.string() << endl;
 
 	// Check img and lidar ptcloud
 	if (!CheckExpectPathExit()) {
@@ -34,6 +36,7 @@ StreamLoader::StreamLoader(const std::string& root_dir) : root_(root_dir) {
 	}
 
 	LoadGtPoses();
+	LoadConfig();
 
 	seq_reader_ptr_.reset(new io::CSVReader<9>(seq_file_.string()));
 	seq_reader_ptr_->read_header(io::ignore_extra_column, seqheader_tstamp_str_,
@@ -72,6 +75,8 @@ void StreamLoader::LoadGtPoses(){
 		if (first_gt) {
 			trans_origin = Vector3d(position_x, position_y, position_z);
 			rot_origin = Quaterniond(quat_w, quat_x, quat_y, quat_z).toRotationMatrix();
+
+			first_gt = false;
 		}
 		
 		Vector3d trans(position_x, position_y, position_z);
@@ -87,6 +92,49 @@ void StreamLoader::LoadGtPoses(){
 	}
 
 	cout << "Loading groundtruth pose... Done" << endl;
+}
+
+void StreamLoader::LoadConfig() {
+	config_fs_ = cv::FileStorage(config_file_.string(), cv::FileStorage::READ);
+
+	config_.cam_intrisics.fx = (float)config_fs_["Camera.fx"];
+	config_.cam_intrisics.fy = (float)config_fs_["Camera.fy"];
+	config_.cam_intrisics.cx = (float)config_fs_["Camera.cx"];
+	config_.cam_intrisics.cy = (float)config_fs_["Camera.cy"];
+
+	config_.cam_distort_param.k1 = (float)config_fs_["Camera.k1"];
+	config_.cam_distort_param.k2 = (float)config_fs_["Camera.k2"];
+	config_.cam_distort_param.p1 = (float)config_fs_["Camera.p1"];
+	config_.cam_distort_param.p2 = (float)config_fs_["Camera.p2"];
+
+	cv::Mat Tlc;
+	config_fs_["Tlc"] >> Tlc;
+
+	config_.Tlc = CvMat4ToEigenIso3d(Tlc);
+
+	cout << "[CamvoxLoader] Config:" << endl
+		<< "-- Camera instrinsics: (fx, fy, cx ,cy)" << config_.cam_intrisics.fx << " "
+		<< config_.cam_intrisics.fy << " "
+		<< config_.cam_intrisics.cx << " "
+		<< config_.cam_intrisics.cy << endl
+		<< "-- Camera distortion params: " << config_.cam_distort_param.k1 << " "
+		<< config_.cam_distort_param.k2 << " "
+		<< config_.cam_distort_param.p1 << " "
+		<< config_.cam_distort_param.p2 << endl
+		<< "-- Tlc: " << endl << config_.Tlc.matrix() << endl;
+}
+
+Eigen::Isometry3d StreamLoader::CvMat4ToEigenIso3d(const cv::Mat& mat) const {
+	assert(mat.cols == 4 && mat.rows == 4);
+
+	Eigen::Matrix4d m;
+	for (int col = 0; col < mat.cols; ++col) {
+		for (int row = 0; row < mat.rows; ++row) {
+			m(col, row) = mat.at<float>(col, row);
+		}
+	}
+
+	return Eigen::Isometry3d(m);
 }
 
 bool StreamLoader::CheckExpectPathExit() const{
@@ -112,8 +160,8 @@ Data StreamLoader::LoadNextData() {
 	using std::string;
 	using std::stof;
 	using std::filesystem::path;
-	using camvox_loader::DataType;
-	using camvox_loader::ImuData;
+	using dataset_loader::DataType;
+	using dataset_loader::ImuData;
 
 	static const string kDTypeImgStr = string("img");
 	static const string kDTypeImuStr = string("imu");
@@ -128,7 +176,7 @@ Data StreamLoader::LoadNextData() {
 	if (d_type == kDTypeImgStr) {
 		path p = root_ / location;
 		d.SetDataType(kDTypeImg);
-		d.SetImg(cv::imread(p.string(), cv::IMREAD_GRAYSCALE));
+		d.SetImg(cv::imread(p.string(), cv::IMREAD_UNCHANGED));
 		return d;
 	}
 	if (d_type == kDTypeImuStr) {

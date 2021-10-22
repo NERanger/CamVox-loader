@@ -3,26 +3,57 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include <filesystem>
+
+#include <opencv2/opencv.hpp>
 
 #include <Eigen/Geometry>
-
-#include <filesystem>
 
 #include "csv.h"
 
 #include "stream_loader/Data.hpp"
 
-namespace camvox_loader {
+namespace dataset_loader {
 	
 class StreamLoader {
 public:
+
+	struct CamIntrinsics {
+		float fx;
+		float fy;
+		float cx;
+		float cy;
+	};
+
+	struct CamDistortParam {
+		float k1;
+		float k2;
+		float p1;
+		float p2;
+	};
+
+	struct Config {
+		CamIntrinsics cam_intrisics;
+		CamDistortParam cam_distort_param;
+		Eigen::Isometry3d Tlc;  // Transformation from camera to lidar
+	};
+
 	StreamLoader(const std::string &root_dir);
 
 	Data LoadNextData();
 
+	inline Eigen::Isometry3d GetGtPose(uint64_t timestamp) const { return gt_poses_.find(timestamp)->second; }
+
+	inline Config GetConfig() const { return config_; }
+
 private:
+
 	void LoadGtPoses();
+	void LoadConfig();
+	
 	bool CheckExpectPathExit() const;
+
+	Eigen::Isometry3d CvMat4ToEigenIso3d(const cv::Mat &mat) const;
 
 	std::unordered_map<uint64_t, Eigen::Isometry3d> gt_poses_;
 
@@ -33,6 +64,11 @@ private:
 	std::filesystem::path lidar_dir_;
 	std::filesystem::path gt_file_;
 	std::filesystem::path seq_file_;
+	std::filesystem::path config_file_;
+
+	cv::FileStorage config_fs_;
+
+	Config config_;
 
 	// Expected header for groundtruth csv file
 	std::string gtheader_tstamp_str_ = std::string("timestamp");

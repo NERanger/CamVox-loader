@@ -13,8 +13,8 @@ using std::cerr;
 using std::endl;
 using std::string;
 
-using camvox_loader::CamvoxLoader;
-using camvox_loader::CamvoxFrame;
+using dataset_loader::CamvoxLoader;
+using dataset_loader::CamvoxFrame;
 
 CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : root_(data_root){
     using boost::filesystem::exists;
