@@ -19,7 +19,7 @@ endif()
 
 
 find_package(OpenCV 4 REQUIRED)
-find_package(PCL REQUIRED COMPONENTS common io)
+find_package(PCL REQUIRED COMPONENTS common io visualization)
 find_package(Boost REQUIRED COMPONENTS filesystem system)
 find_package(Eigen3 REQUIRED)
 find_package(Threads REQUIRED)

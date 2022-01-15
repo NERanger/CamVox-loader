@@ -50,7 +50,7 @@ int main(int argc, char const* argv[]) {
             accu_cloud += cloud;
 
             ++cnt;
-            if (cnt > 500) {
+            if (cnt > 5000) {
                 break;
             }
         }

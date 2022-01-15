@@ -12,4 +12,6 @@ namespace dataset_loader {
 
 	pcl::PointCloud<pcl::PointXYZ> LivoxPtcloud2XYZ(const pcl::PointCloud<LivoxPoint> &lvx_ptcloud);
 
+	void SimpleCloudVisualization(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud);
+
 }

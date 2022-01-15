@@ -2,6 +2,8 @@
 
 #include "camvox_loader/camvox_loader.hpp"
 
+#include "utils/utils.hpp"
+
 using std::string;
 
 using dataset_loader::CamvoxLoader;
@@ -42,9 +44,12 @@ int main(int argc, char const *argv[]){
         cv::imshow("rgb", f.rgb_img);
         cv::imshow("depth", f.depth_img);
 
-        std::cout << f.Twc.matrix() << std::endl;
+        // std::cout << f.Twc.matrix() << std::endl;
+        pcl::PointCloud<pcl::PointXYZI>::Ptr cloud = CamvoxLoader::DepthImgToPtcloud(f.depth_img);
 
         cv::waitKey(1);
+
+        dataset_loader::SimpleCloudVisualization(cloud);
     }
     
     return EXIT_SUCCESS;

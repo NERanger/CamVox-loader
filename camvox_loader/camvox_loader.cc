@@ -16,6 +16,9 @@ using std::string;
 using dataset_loader::CamvoxLoader;
 using dataset_loader::CamvoxFrame;
 
+dataset_loader::CameraIntrinsics CamvoxLoader::cam_intrinsics_;
+float CamvoxLoader::depth_factor_;
+
 CamvoxLoader::CamvoxLoader(const std::string &data_root, bool &if_success) : root_(data_root){
     using boost::filesystem::exists;
 
@@ -198,4 +201,26 @@ void CamvoxLoader::OutPutKittiFormat(std::ofstream &ofstream){
                  << p(1, 0) << " " << p(1, 1) << " " << p(1, 2) << " " << p(1, 3) << " "
                  << p(2, 0) << " " << p(2, 1) << " " << p(2, 2) << " " << p(2, 3) << std::endl;
     }   
+}
+
+pcl::PointCloud<pcl::PointXYZI>::Ptr CamvoxLoader::DepthImgToPtcloud(cv::Mat depth_img) {
+    using pcl::PointCloud;
+    using pcl::PointXYZI;
+
+    PointCloud<PointXYZI>::Ptr cloud(new PointCloud<PointXYZI>);
+    for (int i = 0; i < depth_img.rows; ++i) {
+        for (int j = 0; j < depth_img.cols; ++j) {
+            const float& depth = depth_img.at<float>(i, j);
+            if (depth < 0.0f) { continue; }
+
+            PointXYZI p;
+            p.x = (j - cam_intrinsics_.cx) * depth / cam_intrinsics_.fx;
+            p.y = (i - cam_intrinsics_.cy) * depth / cam_intrinsics_.fy;
+            p.z = depth * depth_factor_;
+
+            cloud->push_back(p);
+        }
+    }
+
+    return cloud;
 }

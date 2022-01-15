@@ -9,6 +9,9 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+
 #include "csv.h"
 
 namespace dataset_loader {
@@ -37,6 +40,8 @@ public:
     inline CameraIntrinsics GetCamIntrisics(){return cam_intrinsics_;}
     inline float GetDepthFactor(){return depth_factor_;}
     // inline Eigen::Isometry3d GetTbc(){return Tbc_;}
+
+    static pcl::PointCloud<pcl::PointXYZI>::Ptr DepthImgToPtcloud(cv::Mat depth_img);
 
     void OutPutKittiFormat(std::ofstream &ofstream);
 
@@ -68,9 +73,10 @@ private:
     boost::filesystem::path gt_path_;
     boost::filesystem::path config_path_;
 
-    CameraIntrinsics cam_intrinsics_;
+    static CameraIntrinsics cam_intrinsics_;
+    static float depth_factor_;
+
     Eigen::Isometry3d Tbc_;  // Transformation from camera to body(IMU)
-    float depth_factor_;
 
     size_t size_ = 0;
 
